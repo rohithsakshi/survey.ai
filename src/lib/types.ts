@@ -19,6 +19,7 @@ export interface DebugTelemetry {
   blobSaved: boolean;
   pagesFound: number;
   embeddedTextLength: number;
+  textExtractionMethod: 'PDF.js' | 'Fallback Parser' | 'OCR' | 'None';
   ocrExecuted: boolean;
   ocrTextLength: number;
   geminiCalled: boolean;

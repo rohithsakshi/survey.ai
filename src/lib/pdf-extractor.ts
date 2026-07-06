@@ -15,10 +15,17 @@ export async function extractTextFromPdf(file: File): Promise<{ text: string; pa
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
+      
+      // Improve extraction by checking items more carefully
       const pageText = textContent.items
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((item: any) => item.str)
+        .map((item: any) => item.str || '')
         .join(' ');
+      
+      console.log(`--- Page ${i} PDF.js Extraction ---`);
+      console.log(`Number of text items: ${textContent.items.length}`);
+      console.log(`Total extracted characters: ${pageText.length}`);
+      console.log(`First 500 characters: ${pageText.substring(0, 500)}`);
       
       fullText += pageText + '\n';
     }

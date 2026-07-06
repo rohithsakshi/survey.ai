@@ -74,7 +74,7 @@ export default function DebugPanel({ telemetryData }: DebugPanelProps) {
                             <div><strong>Village:</strong> {t.villageFound ? 'YES' : 'NO'}</div>
                             <div><strong>Taluk:</strong> {t.talukFound ? 'YES' : 'NO'}</div>
                             <div><strong>District:</strong> {t.districtFound ? 'YES' : 'NO'}</div>
-                            <div><strong>Cache Saved:</strong> {t.cacheSaved ? 'YES' : 'NO'}</div>
+                            <div><strong>Method:</strong> {t.textExtractionMethod}</div>
                             <div><strong>Viewer Ready:</strong> {t.viewerReady ? 'YES' : 'NO'}</div>
                           </div>
                           

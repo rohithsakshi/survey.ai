@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import PdfViewerModal from '@/components/viewer/PdfViewerModal';
 import DebugPanel from '@/components/debug/DebugPanel';
 import { DebugTelemetry } from '@/lib/types';
+import { extractWithRegex } from '@/lib/regex-extractor';
 
 export default function Home() {
   const [stats, setStats] = useState({
@@ -83,6 +84,7 @@ export default function Home() {
           blobSaved: false,
           pagesFound: 0,
           embeddedTextLength: 0,
+          textExtractionMethod: 'None',
           ocrExecuted: false,
           ocrTextLength: 0,
           geminiCalled: false,
@@ -108,9 +110,45 @@ export default function Home() {
             console.error('PDF Extraction Error:', pdfResult.error);
           }
           
+          if (text.trim().length > 0) {
+            telemetry.textExtractionMethod = 'PDF.js';
+          }
+          
+          // Fallback parser if PDF.js fails
+          if (text.trim().length === 0) {
+            console.log('PDF.js failed to extract text. Trying server fallback (pdf-parse)...');
+            updateDoc(id, { status: 'Extracting Text...', telemetry });
+            
+            try {
+              const formData = new FormData();
+              formData.append('file', file);
+              
+              const res = await fetch('/api/parse', {
+                method: 'POST',
+                body: formData
+              });
+              
+              if (res.ok) {
+                const parseData = await res.json();
+                if (parseData.text && parseData.text.trim().length > 0) {
+                  text = parseData.text;
+                  telemetry.embeddedTextLength = text.length;
+                  telemetry.pagesFound = parseData.pages || 0;
+                  telemetry.textExtractionMethod = 'Fallback Parser';
+                }
+              } else {
+                console.warn('Fallback parser returned error:', await res.text());
+              }
+            } catch (fallbackError) {
+              console.warn('Fallback parser threw exception:', fallbackError);
+            }
+          }
+          
+          // OCR as an absolute last resort
           if (text.trim().length === 0) {
             updateDoc(id, { status: 'Running OCR...', telemetry });
             telemetry.ocrExecuted = true;
+            telemetry.textExtractionMethod = 'OCR';
             const ocrResult = await performOcrOnPdf(file);
             text = ocrResult.text;
             telemetry.ocrTextLength = text.length;
@@ -123,23 +161,31 @@ export default function Home() {
           }
           
           if (text.trim().length === 0) {
-            updateDoc(id, { status: 'Extraction Failed', telemetry, errorMessage: 'No text could be extracted.' });
+            updateDoc(id, { status: 'Extraction Failed', telemetry, errorMessage: 'No text could be extracted by any method.' });
             return;
           }
 
-          let surveyNumbers: string[] = [];
-          let village = '';
-          let taluk = '';
-          let district = '';
+          // Step 1: Regex Extraction
+          console.log('Running Regex Extractor...');
+          const regexResults = extractWithRegex(text);
+          let surveyNumbers = regexResults.surveyNumbers;
+          let village = regexResults.village;
+          let taluk = regexResults.taluk;
+          let district = regexResults.district;
           
-          updateDoc(id, { status: 'Calling Gemini...', telemetry });
-          telemetry.geminiCalled = true;
+          const isComplete = surveyNumbers.length > 0 && village && taluk && district;
           
-          // Simple retry logic
-          let retries = 3;
-          let success = false;
-          
-          while (retries > 0 && !success) {
+          // Step 2: Gemini Fallback for Missing Fields
+          if (!isComplete) {
+            console.log('Regex missed fields. Calling Gemini Fallback...');
+            updateDoc(id, { status: 'Calling Gemini...', telemetry });
+            telemetry.geminiCalled = true;
+            
+            // Simple retry logic
+            let retries = 3;
+            let success = false;
+            
+            while (retries > 0 && !success) {
             try {
               const response = await fetch('/api/extract', {
                 method: 'POST',
@@ -153,25 +199,32 @@ export default function Home() {
                 telemetry.geminiRawResponse = data.rawResponse;
               }
 
-              if (response.ok) {
-                surveyNumbers = data.surveyNumbers || [];
-                village = data.village || '';
-                taluk = data.taluk || '';
-                district = data.district || '';
-                success = true;
-              } else {
-                throw new Error(data.error || 'API Error');
+                if (response.ok) {
+                  // Merge Gemini data into regex data, preferring regex if available
+                  if (surveyNumbers.length === 0 && data.surveyNumbers) {
+                    surveyNumbers = data.surveyNumbers;
+                  }
+                  if (!village && data.village) village = data.village;
+                  if (!taluk && data.taluk) taluk = data.taluk;
+                  if (!district && data.district) district = data.district;
+                  
+                  success = true;
+                } else {
+                  throw new Error(data.error || 'API Error');
+                }
+              } catch (e) {
+                const err = e as Error;
+                retries--;
+                console.error(`Gemini Attempt Failed (${retries} left):`, err.message);
+                if (retries === 0) {
+                  updateDoc(id, { status: 'Gemini Failed', telemetry, errorMessage: err.message });
+                  return;
+                }
+                await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
               }
-            } catch (e) {
-              const err = e as Error;
-              retries--;
-              console.error(`Gemini Attempt Failed (${retries} left):`, err.message);
-              if (retries === 0) {
-                updateDoc(id, { status: 'Gemini Failed', telemetry, errorMessage: err.message });
-                return;
-              }
-              await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
             }
+          } else {
+            console.log('Regex extraction fully successful. Skipping Gemini.');
           }
           
           // Strict JSON Validation (Ensure at least something was extracted)
