@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     const err = error as Error;
     console.error('Gemini OCR Error:', err);
     return NextResponse.json({ 
-      error: 'Failed to run OCR', 
+      error: 'Failed to run OCR on Vercel Server', 
       details: err.message 
     }, { status: 500 });
   }

@@ -1,4 +1,4 @@
-import { createWorker } from 'tesseract.js';
+
 
 export async function performOcrOnPdf(
   file: File, 
@@ -38,38 +38,28 @@ export async function performOcrOnPdf(
         viewport: viewport
       };
       
-      onLog(`Rendering PDF page ${i} to canvas...`);
+      onLog(`Rendering PDF page ${i} to white canvas...`);
       await page.render(renderContext).promise;
       
       onLog(`Converting canvas to PNG...`);
       const dataUrl = canvas.toDataURL('image/png');
       
-      onLog('Creating Tesseract worker...');
-      let worker;
-      try {
-        worker = await createWorker('eng', 1, {
-          logger: m => console.log('Tesseract:', m),
-        });
-        onLog('Worker created and Language loaded');
-      } catch (error) {
-        const err = error as Error;
-        onLog('Worker failed to load: ' + err.message);
-        throw new Error('Worker failed to load: ' + err.message);
+      onLog('Sending image to Gemini Vision API...');
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl })
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json();
+        onLog(`API Error: ${errData.details || errData.error}`);
+        throw new Error(errData.details || errData.error || 'Gemini OCR failed');
       }
       
-      onLog('OCR ready. Executing Tesseract...');
-      try {
-        const { data: { text } } = await worker.recognize(dataUrl);
-        onLog(`OCR executed successfully for page ${i}`);
-        fullText += text + '\n';
-      } catch (error) {
-        const err = error as Error;
-        onLog('Tesseract exception during recognition: ' + err.message);
-        throw new Error('Tesseract exception: ' + err.message);
-      } finally {
-        await worker.terminate();
-        onLog('Worker terminated.');
-      }
+      const data = await response.json();
+      onLog(`OCR executed successfully via Gemini for page ${i}`);
+      fullText += data.text + '\n';
     }
     
     return { text: fullText, pages: maxPages };
