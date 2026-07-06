@@ -153,3 +153,16 @@
   max-height: 200px;
   overflow-y: auto;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .debugTable {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

@@ -105,3 +105,24 @@
 .infoIcon {
   flex-shrink: 0;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .dropzone {
+    padding: 32px 16px;
+  }
+  
+  .title {
+    font-size: 1.25rem;
+  }
+  
+  .buttonGroup {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .uploadButton, 
+  .uploadButtonSecondary {
+    width: 100%;
+  }
+}

@@ -123,3 +123,25 @@
   font-size: 0.875rem;
   color: var(--text-muted);
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .modalContent {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+  
+  .viewerContainer {
+    padding: 16px;
+  }
+  
+  .modalHeader {
+    padding: 16px;
+  }
+  
+  .modalFooter {
+    padding: 16px;
+  }
+}

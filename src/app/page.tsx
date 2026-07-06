@@ -13,6 +13,7 @@ import PdfViewerModal from '@/components/viewer/PdfViewerModal';
 import DebugPanel from '@/components/debug/DebugPanel';
 import { DebugTelemetry } from '@/lib/types';
 import { extractWithRegex } from '@/lib/regex-extractor';
+import styles from './page.module.css';
 
 export default function Home() {
   const [stats, setStats] = useState({
@@ -408,25 +409,17 @@ export default function Home() {
         />
       }
     >
-      <div style={{ padding: '32px' }}>
+      <div className={styles.pageContainer}>
         <FileUpload onFilesSelected={handleFilesSelected} />
         
         <div style={{ marginTop: '48px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: '#ffffff' }}>
+          <div className={styles.recordsHeader}>
+            <h2 className={styles.recordsTitle}>
               Extracted Land Records
             </h2>
             <button 
               onClick={clearCache}
-              style={{
-                background: 'transparent',
-                border: '1px solid #333',
-                color: '#a1a1aa',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
+              className={styles.clearButton}
             >
               Clear Cache
             </button>
