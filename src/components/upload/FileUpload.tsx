@@ -63,14 +63,12 @@ export default function FileUpload({ onFilesSelected }: FileUploadProps) {
               onChange={handleFileInput}
             />
           </label>
-          {/* @ts-ignore - directory attributes for folder selection */}
           <label className={styles.uploadButtonSecondary}>
             <span>Select Folder</span>
             <input 
               type="file" 
-              // @ts-ignore
-              webkitdirectory="true"
-              directory="true"
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              {...({ webkitdirectory: "true", directory: "true" } as any)}
               className={styles.hiddenInput} 
               onChange={handleFileInput}
             />

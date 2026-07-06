@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { ProcessingStatus } from './types';
 
 export interface DocumentRecord {
   id?: number;
@@ -6,8 +7,11 @@ export interface DocumentRecord {
   fileSize: number;
   fileHash: string; // To detect duplicates
   uploadDate: number;
-  status: 'pending' | 'processing' | 'completed' | 'error';
+  status: ProcessingStatus;
   errorMessage?: string;
+  
+  // The actual PDF file blob
+  fileBlob?: Blob;
   
   // Extracted Data
   surveyNumbers?: string[]; // Multiple survey numbers
@@ -18,24 +22,15 @@ export interface DocumentRecord {
   // Metadata
   pageNumber?: number; // Page where the data was found
   confidence?: number;
-  needsAi?: boolean;
-}
-
-export interface OcrCache {
-  fileHash: string;
-  pageNumber: number;
-  rawText: string;
 }
 
 const db = new Dexie('SurveyAIDatabase') as Dexie & {
   documents: EntityTable<DocumentRecord, 'id'>;
-  ocrCache: EntityTable<OcrCache, 'fileHash'>;
 };
 
 // Schema versioning
-db.version(2).stores({
-  documents: '++id, fileName, fileHash, status, *surveyNumbers, village, taluk, district', // Indexed fields (* for array indexing)
-  ocrCache: '[fileHash+pageNumber]' // Compound primary key
+db.version(3).stores({
+  documents: '++id, fileName, fileHash, status, *surveyNumbers, village, taluk, district'
 });
 
 export { db };

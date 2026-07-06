@@ -1,4 +1,3 @@
-import * as pdfjsLib from 'pdfjs-dist';
 import Tesseract from 'tesseract.js';
 
 export async function performOcrOnPdf(file: File): Promise<string> {
@@ -28,6 +27,7 @@ export async function performOcrOnPdf(file: File): Promise<string> {
       canvas.height = viewport.height;
       canvas.width = viewport.width;
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderContext: any = {
         canvasContext: context,
         viewport: viewport

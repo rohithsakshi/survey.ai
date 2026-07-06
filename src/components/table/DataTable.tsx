@@ -54,6 +54,17 @@ export default function DataTable({ data, onRowClick }: DataTableProps) {
       header: 'District',
     },
     {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: (info) => {
+        const status = info.getValue() as string;
+        const color = status === 'Completed' ? '#4ade80' : 
+                      status === 'Failed' ? '#f87171' : 
+                      '#60a5fa'; // light blue for processing
+        return <span style={{ color }}>{status}</span>;
+      }
+    },
+    {
       id: 'open',
       header: 'Open',
       cell: (info) => (

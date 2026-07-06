@@ -1,0 +1,133 @@
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { X } from 'lucide-react';
+import styles from './PdfViewerModal.module.css';
+
+// We will use dynamic import inside useEffect to avoid SSR DOMMatrix error
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+interface PdfViewerModalProps {
+  fileBlob: Blob;
+  pdfName: string;
+  surveyNumbers: string[];
+  onClose: () => void;
+}
+
+export default function PdfViewerModal({ fileBlob, pdfName, surveyNumbers, onClose }: PdfViewerModalProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(true);
+
+  useEffect(() => {
+    const loadPdf = async () => {
+      try {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+        const arrayBuffer = await fileBlob.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+        const pdf = await loadingTask.promise;
+        setPdfDoc(pdf);
+        setTotalPages(pdf.numPages);
+        
+        // Simple search logic: find the first page that contains any survey number
+        let foundPage = 1;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pageText = textContent.items.map((item) => (item as any).str).join(' ');
+          
+          if (surveyNumbers.some(num => pageText.includes(num))) {
+            foundPage = i;
+            break;
+          }
+        }
+        
+        setCurrentPage(foundPage);
+        setIsSearching(false);
+      } catch (error) {
+        console.error('Error loading PDF:', error);
+        setIsSearching(false);
+      }
+    };
+    
+    loadPdf();
+  }, [fileBlob, surveyNumbers]);
+
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!canvasRef.current || !pdfDoc) return;
+    
+    const page = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1.5 });
+    
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const renderContext: any = {
+      canvasContext: context,
+      viewport: viewport
+    };
+    
+    await page.render(renderContext).promise;
+  }, [pdfDoc]);
+
+  useEffect(() => {
+    if (pdfDoc && !isSearching) {
+      renderPage(currentPage);
+    }
+  }, [pdfDoc, currentPage, isSearching, renderPage]);
+
+  return (
+    <div className={styles.modalOverlay}>
+      <div className={styles.modalContent}>
+        <div className={styles.modalHeader}>
+          <div>
+            <h3 className={styles.title}>{pdfName}</h3>
+            {surveyNumbers.length > 0 && (
+              <p className={styles.subtitle}>Detected: {surveyNumbers.join(', ')}</p>
+            )}
+          </div>
+          <button className={styles.closeButton} onClick={onClose}>
+            <X size={24} />
+          </button>
+        </div>
+        
+        <div className={styles.viewerContainer}>
+          {isSearching ? (
+            <div className={styles.loadingState}>Analyzing PDF and locating records...</div>
+          ) : (
+            <canvas ref={canvasRef} className={styles.canvas} />
+          )}
+        </div>
+        
+        <div className={styles.modalFooter}>
+          <button 
+            disabled={currentPage <= 1 || isSearching}
+            onClick={() => setCurrentPage(p => p - 1)}
+            className={styles.pageButton}
+          >
+            Previous
+          </button>
+          <span className={styles.pageInfo}>
+            Page {currentPage} of {totalPages || '?'}
+          </span>
+          <button 
+            disabled={currentPage >= totalPages || isSearching}
+            onClick={() => setCurrentPage(p => p + 1)}
+            className={styles.pageButton}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
