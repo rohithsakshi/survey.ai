@@ -20,7 +20,7 @@ export async function performOcrOnPdf(
     for (let i = 1; i <= maxPages; i++) {
       onLog(`Processing page ${i} for OCR...`);
       const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 1.5 });
+      let viewport = page.getViewport({ scale: 1.2 }); // Reduced scale
       
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
@@ -38,11 +38,27 @@ export async function performOcrOnPdf(
         viewport: viewport
       };
       
-      onLog(`Rendering PDF page ${i} to white canvas...`);
+      onLog(`Rendering PDF page ${i} to white canvas (Scale 1.2)...`);
       await page.render(renderContext).promise;
       
-      onLog(`Converting canvas to PNG...`);
-      const dataUrl = canvas.toDataURL('image/png');
+      onLog(`Converting canvas to JPEG (70% quality)...`);
+      let dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      
+      // Check payload size (approximate chars to bytes)
+      const PAYLOAD_LIMIT = 3.5 * 1024 * 1024; // 3.5 MB safety limit
+      if (dataUrl.length > PAYLOAD_LIMIT) {
+        onLog(`Payload too large (${(dataUrl.length / 1024 / 1024).toFixed(2)} MB). Re-rendering at Scale 1.0 / 50% quality...`);
+        viewport = page.getViewport({ scale: 1.0 });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fallbackRenderContext: any = { canvasContext: context, viewport: viewport };
+        await page.render(fallbackRenderContext).promise;
+        dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+        onLog(`Fallback payload size: ${(dataUrl.length / 1024 / 1024).toFixed(2)} MB`);
+      }
       
       let response;
       try {
@@ -79,9 +95,9 @@ export async function performOcrOnPdf(
       try {
         data = await response.json();
       } catch (err) {
-        const e = err as Error;
-        onLog(`JSON Parse Error on successful response: ${e.message}`);
-        throw new Error(`Failed to parse Gemini response: ${e.message}`);
+        const fetchErr = err as Error;
+        onLog(`JSON Parse Error on successful response: ${fetchErr.message}`);
+        throw new Error(`Failed to parse Gemini response: ${fetchErr.message}`);
       }
       
       onLog(`OCR executed successfully via Gemini for page ${i}`);
