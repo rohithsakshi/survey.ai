@@ -89,12 +89,54 @@ export default function PdfViewerModal({ fileBlob, pdfName, surveyNumbers, onClo
       };
       
       await page.render(renderContext).promise;
+
+      // ==========================================
+      // OVERLAY HIGHLIGHTING (CANVAS-BASED)
+      // ==========================================
+      if (surveyNumbers && surveyNumbers.length > 0) {
+        try {
+          const textContent = await page.getTextContent();
+          
+          // Set highlight color (yellow, 40% opacity)
+          context.fillStyle = 'rgba(253, 224, 71, 0.4)';
+          
+          for (const item of textContent.items) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const textItem = item as any;
+            if (!textItem.str || !textItem.transform) continue;
+            
+            const str = textItem.str.trim();
+            if (!str) continue;
+            
+            const isMatch = surveyNumbers.some(num => {
+              const safeNum = num.trim().toLowerCase();
+              return safeNum && (str.toLowerCase().includes(safeNum) || safeNum.includes(str.toLowerCase()));
+            });
+            
+            if (isMatch) {
+              const tx = textItem.transform;
+              // tx[4] is X, tx[5] is Y (baseline)
+              const [x, y] = viewport.convertToViewportPoint(tx[4], tx[5]);
+              
+              const width = textItem.width * viewport.scale;
+              const height = Math.abs(tx[3]) * viewport.scale;
+              
+              // Draw rectangle (Y is baseline, so we subtract height to get top-left)
+              // Adding a small padding
+              context.fillRect(x - 2, y - height - 2, width + 4, height + 4);
+            }
+          }
+        } catch (textErr) {
+          console.warn('Failed to extract text for highlighting:', textErr);
+        }
+      }
+      
     } catch (error) {
       const err = error as Error;
       console.error('Canvas render error:', err);
       throw err;
     }
-  }, [pdfDoc]);
+  }, [pdfDoc, surveyNumbers]);
 
   useEffect(() => {
     if (pdfDoc && !isSearching) {
