@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     // Strip the data:image/png;base64, prefix if present
     const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `Extract all text from this image exactly as it appears. Do not format it or add conversational text. Just the raw text.`;
 
