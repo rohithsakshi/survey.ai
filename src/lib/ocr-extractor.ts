@@ -28,7 +28,7 @@ export async function performOcrOnPdf(file: File): Promise<string> {
       canvas.height = viewport.height;
       canvas.width = viewport.width;
       
-      const renderContext = {
+      const renderContext: any = {
         canvasContext: context,
         viewport: viewport
       };
