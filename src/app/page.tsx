@@ -217,7 +217,7 @@ export default function Home() {
                   
                   success = true;
                 } else {
-                  throw new Error(data.error || 'API Error');
+                  throw new Error(data.details || data.error || 'API Error');
                 }
               } catch (e) {
                 const err = e as Error;

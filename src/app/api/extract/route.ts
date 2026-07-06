@@ -8,6 +8,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: NextRequest) {
   try {
+    const hasKey = !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 0;
+    if (!hasKey) {
+      throw new Error('GEMINI_API_KEY environment variable is missing or empty.');
+    }
+
     const { text } = await req.json();
 
     if (!text) {
