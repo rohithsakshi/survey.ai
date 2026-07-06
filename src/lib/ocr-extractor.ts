@@ -1,6 +1,6 @@
 import Tesseract from 'tesseract.js';
 
-export async function performOcrOnPdf(file: File): Promise<string> {
+export async function performOcrOnPdf(file: File): Promise<{ text: string; pages: number; error?: string }> {
   try {
     const pdfjs = await import('pdfjs-dist');
     pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -48,9 +48,10 @@ export async function performOcrOnPdf(file: File): Promise<string> {
       fullText += text + '\n';
     }
     
-    return fullText;
+    return { text: fullText, pages: maxPages };
   } catch (error) {
-    console.error('OCR Error:', error);
-    return '';
+    const err = error as Error;
+    console.error('OCR Error:', err);
+    return { text: '', pages: 0, error: err.message };
   }
 }

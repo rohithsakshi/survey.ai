@@ -10,6 +10,8 @@ import { extractTextFromPdf } from '@/lib/pdf-extractor';
 import { performOcrOnPdf } from '@/lib/ocr-extractor';
 import { db } from '@/lib/db';
 import PdfViewerModal from '@/components/viewer/PdfViewerModal';
+import DebugPanel from '@/components/debug/DebugPanel';
+import { DebugTelemetry } from '@/lib/types';
 
 export default function Home() {
   const [stats, setStats] = useState({
@@ -74,76 +76,151 @@ export default function Home() {
       const batch = queueRef.current.splice(0, CONCURRENCY_LIMIT);
       
       await Promise.all(batch.map(async ({ file, id }) => {
+        const telemetry: DebugTelemetry = {
+          fileHash: id,
+          fileName: file.name,
+          fileLoaded: true,
+          blobSaved: false,
+          pagesFound: 0,
+          embeddedTextLength: 0,
+          ocrExecuted: false,
+          ocrTextLength: 0,
+          geminiCalled: false,
+          geminiRawResponse: '',
+          extractionSuccess: false,
+          surveyNumbersFound: false,
+          villageFound: false,
+          talukFound: false,
+          districtFound: false,
+          cacheSaved: false,
+          viewerReady: false
+        };
+
         try {
-          updateDoc(id, { status: 'Reading PDF...' });
-          let text = await extractTextFromPdf(file);
+          updateDoc(id, { status: 'Reading PDF...', telemetry });
+          const pdfResult = await extractTextFromPdf(file);
+          let text = pdfResult.text;
           
-          if (text.trim().length === 0) {
-            updateDoc(id, { status: 'Running OCR...' });
-            text = await performOcrOnPdf(file);
+          telemetry.pagesFound = pdfResult.pages;
+          telemetry.embeddedTextLength = text.length;
+          
+          if (pdfResult.error) {
+            console.error('PDF Extraction Error:', pdfResult.error);
           }
           
+          if (text.trim().length === 0) {
+            updateDoc(id, { status: 'Running OCR...', telemetry });
+            telemetry.ocrExecuted = true;
+            const ocrResult = await performOcrOnPdf(file);
+            text = ocrResult.text;
+            telemetry.ocrTextLength = text.length;
+            
+            if (ocrResult.error) {
+              console.error('OCR Error:', ocrResult.error);
+              updateDoc(id, { status: 'OCR Failed', telemetry, errorMessage: ocrResult.error });
+              return; // Stop processing
+            }
+          }
+          
+          if (text.trim().length === 0) {
+            updateDoc(id, { status: 'Extraction Failed', telemetry, errorMessage: 'No text could be extracted.' });
+            return;
+          }
+
           let surveyNumbers: string[] = [];
           let village = '';
           let taluk = '';
           let district = '';
           
-          if (text.trim().length > 0) {
-             updateDoc(id, { status: 'Calling Gemini...' });
-             
-             // Simple retry logic
-             let retries = 3;
-             let success = false;
-             
-             while (retries > 0 && !success) {
-               try {
-                 const response = await fetch('/api/extract', {
-                   method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify({ text, filename: file.name })
-                 });
-                 
-                 if (response.ok) {
-                   const data = await response.json();
-                   surveyNumbers = data.surveyNumbers || [];
-                   village = data.village || '';
-                   taluk = data.taluk || '';
-                   district = data.district || '';
-                   success = true;
-                 } else {
-                   throw new Error('API Error');
-                 }
-               } catch (e) {
-                 retries--;
-                 if (retries === 0) throw e;
-                 await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
-               }
-             }
+          updateDoc(id, { status: 'Calling Gemini...', telemetry });
+          telemetry.geminiCalled = true;
+          
+          // Simple retry logic
+          let retries = 3;
+          let success = false;
+          
+          while (retries > 0 && !success) {
+            try {
+              const response = await fetch('/api/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+              });
+              
+              const data = await response.json();
+              
+              if (data.rawResponse) {
+                telemetry.geminiRawResponse = data.rawResponse;
+              }
+
+              if (response.ok) {
+                surveyNumbers = data.surveyNumbers || [];
+                village = data.village || '';
+                taluk = data.taluk || '';
+                district = data.district || '';
+                success = true;
+              } else {
+                throw new Error(data.error || 'API Error');
+              }
+            } catch (e) {
+              const err = e as Error;
+              retries--;
+              console.error(`Gemini Attempt Failed (${retries} left):`, err.message);
+              if (retries === 0) {
+                updateDoc(id, { status: 'Gemini Failed', telemetry, errorMessage: err.message });
+                return;
+              }
+              await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
+            }
           }
+          
+          // Strict JSON Validation (Ensure at least something was extracted)
+          if (surveyNumbers.length === 0 && !village && !taluk && !district) {
+            telemetry.extractionSuccess = false;
+            updateDoc(id, { status: 'Extraction Failed', telemetry, errorMessage: 'Gemini returned empty fields.' });
+            return;
+          }
+
+          telemetry.extractionSuccess = true;
+          telemetry.surveyNumbersFound = surveyNumbers.length > 0;
+          telemetry.villageFound = !!village;
+          telemetry.talukFound = !!taluk;
+          telemetry.districtFound = !!district;
           
           updateDoc(id, { 
             status: 'Saving Cache...',
             surveyNumbers,
             village,
             taluk,
-            district
+            district,
+            telemetry
           });
           
           // Save to Dexie IndexedDB
-          await db.documents.add({
-            fileName: file.name,
-            fileHash: id, 
-            fileSize: file.size,
-            uploadDate: Date.now(),
-            status: 'Completed',
-            surveyNumbers,
-            village,
-            taluk,
-            district,
-            fileBlob: file // Store the raw PDF blob as requested
-          });
+          try {
+            await db.documents.add({
+              fileName: file.name,
+              fileHash: id, 
+              fileSize: file.size,
+              uploadDate: Date.now(),
+              status: 'Completed',
+              surveyNumbers,
+              village,
+              taluk,
+              district,
+              fileBlob: file 
+            });
+            telemetry.cacheSaved = true;
+            telemetry.blobSaved = true;
+            telemetry.viewerReady = true;
+          } catch (dbError) {
+            const err = dbError as Error;
+            console.error('Dexie Save Error:', err);
+            updateDoc(id, { status: 'Failed', telemetry, errorMessage: 'Failed to save cache: ' + err.message });
+            return;
+          }
           
-          updateDoc(id, { status: 'Completed' });
+          updateDoc(id, { status: 'Completed', telemetry });
           
           setStats(prev => ({
             ...prev,
@@ -154,7 +231,7 @@ export default function Home() {
         } catch (error) {
           const err = error as Error;
           console.error('Failed to process file:', file.name, err);
-          updateDoc(id, { status: 'Failed', errorMessage: err.message || 'Unknown error' });
+          updateDoc(id, { status: 'Failed', telemetry, errorMessage: err.message || 'Unknown error' });
         }
       }));
     }
@@ -240,8 +317,9 @@ export default function Home() {
       } else {
         alert('The PDF file is not found in the local cache. Please upload it again.');
       }
-    } catch (e) {
-      console.error('Error fetching blob:', e);
+    } catch (error) {
+      const err = error as Error;
+      console.error('Error during document retrieval:', err);
       alert('Failed to load PDF from cache.');
     }
   };
@@ -305,6 +383,10 @@ export default function Home() {
           onClose={() => setSelectedDoc(null)}
         />
       )}
+      
+      <DebugPanel 
+        telemetryData={documents.map(d => d.telemetry).filter(Boolean) as DebugTelemetry[]} 
+      />
     </MainLayout>
   );
 }

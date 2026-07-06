@@ -19,6 +19,7 @@ export default function PdfViewerModal({ fileBlob, pdfName, surveyNumbers, onClo
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [isSearching, setIsSearching] = useState(true);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPdf = async () => {
@@ -35,14 +36,19 @@ export default function PdfViewerModal({ fileBlob, pdfName, surveyNumbers, onClo
         // Simple search logic: find the first page that contains any survey number
         let foundPage = 1;
         for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const pageText = textContent.items.map((item) => (item as any).str).join(' ');
-          
-          if (surveyNumbers.some(num => pageText.includes(num))) {
-            foundPage = i;
-            break;
+          try {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const pageText = textContent.items.map((item) => (item as any).str).join(' ');
+            
+            if (surveyNumbers.some(num => pageText.includes(num))) {
+              foundPage = i;
+              break;
+            }
+          } catch (e) {
+            const err = e as Error;
+            console.warn(`Failed to parse text on page ${i}`, err);
           }
         }
         
@@ -60,28 +66,43 @@ export default function PdfViewerModal({ fileBlob, pdfName, surveyNumbers, onClo
   const renderPage = useCallback(async (pageNum: number) => {
     if (!canvasRef.current || !pdfDoc) return;
     
-    const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.5 });
-    
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const renderContext: any = {
-      canvasContext: context,
-      viewport: viewport
-    };
-    
-    await page.render(renderContext).promise;
+    try {
+      setRenderError(null);
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+      
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      // Fix black screen: fill canvas with white before rendering
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const renderContext: any = {
+        canvasContext: context,
+        viewport: viewport
+      };
+      
+      await page.render(renderContext).promise;
+    } catch (error) {
+      const err = error as Error;
+      console.error('Canvas render error:', err);
+      throw err;
+    }
   }, [pdfDoc]);
 
   useEffect(() => {
     if (pdfDoc && !isSearching) {
-      renderPage(currentPage);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRenderError(null);
+      renderPage(currentPage).catch(err => {
+        setRenderError(err.message || 'Failed to render PDF page');
+      });
     }
   }, [pdfDoc, currentPage, isSearching, renderPage]);
 
@@ -103,6 +124,10 @@ export default function PdfViewerModal({ fileBlob, pdfName, surveyNumbers, onClo
         <div className={styles.viewerContainer}>
           {isSearching ? (
             <div className={styles.loadingState}>Analyzing PDF and locating records...</div>
+          ) : renderError ? (
+            <div className={styles.loadingState} style={{ color: '#ef4444' }}>
+              Error rendering PDF: {renderError}
+            </div>
           ) : (
             <canvas ref={canvasRef} className={styles.canvas} />
           )}

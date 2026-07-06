@@ -57,11 +57,16 @@ ${text.substring(0, 30000)} // Limiting text to prevent token overflow for huge 
       surveyNumbers: data.surveyNumbers || [],
       village: data.village || '',
       taluk: data.taluk || '',
-      district: data.district || ''
+      district: data.district || '',
+      rawResponse: responseText
     });
 
   } catch (error) {
-    console.error('Error during Gemini extraction:', error);
-    return NextResponse.json({ error: 'Failed to process document' }, { status: 500 });
+    const err = error as Error;
+    console.error('Error during Gemini extraction:', err);
+    return NextResponse.json({ 
+      error: 'Failed to process document', 
+      details: err.message 
+    }, { status: 500 });
   }
 }

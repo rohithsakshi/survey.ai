@@ -1,4 +1,4 @@
-export async function extractTextFromPdf(file: File): Promise<string> {
+export async function extractTextFromPdf(file: File): Promise<{ text: string; pages: number; error?: string }> {
   try {
     // Dynamically import pdfjs-dist to avoid SSR DOMMatrix errors in Next.js
     const pdfjsLib = await import('pdfjs-dist');
@@ -23,9 +23,10 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       fullText += pageText + '\n';
     }
     
-    return fullText;
+    return { text: fullText, pages: pdf.numPages };
   } catch (error) {
-    console.error('Error extracting text from PDF:', error);
-    return '';
+    const err = error as Error;
+    console.error('PDF Extraction Error:', err);
+    return { text: '', pages: 0, error: err.message };
   }
 }
