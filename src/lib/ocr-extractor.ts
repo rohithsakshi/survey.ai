@@ -1,4 +1,4 @@
-import Tesseract from 'tesseract.js';
+
 
 export async function performOcrOnPdf(file: File): Promise<{ text: string; pages: number; error?: string }> {
   try {
@@ -27,6 +27,10 @@ export async function performOcrOnPdf(file: File): Promise<{ text: string; pages
       canvas.height = viewport.height;
       canvas.width = viewport.width;
       
+      // Fix: fill canvas with white so Tesseract/Gemini can read it properly
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderContext: any = {
         canvasContext: context,
@@ -38,14 +42,20 @@ export async function performOcrOnPdf(file: File): Promise<{ text: string; pages
       // Convert canvas to image data URL
       const dataUrl = canvas.toDataURL('image/png');
       
-      // Run Tesseract OCR on the image
-      const { data: { text } } = await Tesseract.recognize(
-        dataUrl,
-        'eng',
-        { logger: m => console.log(m) }
-      );
+      // Call our Gemini Vision OCR route
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl })
+      });
       
-      fullText += text + '\n';
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Gemini OCR failed');
+      }
+      
+      const data = await response.json();
+      fullText += data.text + '\n';
     }
     
     return { text: fullText, pages: maxPages };
