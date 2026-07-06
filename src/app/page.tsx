@@ -7,6 +7,7 @@ import AISummary from '@/components/summary/AISummary';
 import DataTable from '@/components/table/DataTable';
 import { DocumentData } from '@/lib/types';
 import { extractTextFromPdf } from '@/lib/pdf-extractor';
+import { performOcrOnPdf } from '@/lib/ocr-extractor';
 import { db } from '@/lib/db';
 
 export default function Home() {
@@ -44,7 +45,13 @@ export default function Home() {
     for (const file of files) {
       try {
         // 1. Extract text using PDF.js
-        const text = await extractTextFromPdf(file);
+        let text = await extractTextFromPdf(file);
+        
+        // If no text found, it's likely a scanned PDF, fallback to OCR
+        if (text.trim().length === 0) {
+          console.log(`No text found in ${file.name}, falling back to OCR...`);
+          text = await performOcrOnPdf(file);
+        }
         
         let surveyNumbers: string[] = [];
         let village = '';
@@ -65,7 +72,11 @@ export default function Home() {
              village = data.village || '';
              taluk = data.taluk || '';
              district = data.district || '';
+           } else {
+             console.error('Gemini API Error:', await response.text());
            }
+        } else {
+           console.log(`Still no text found after OCR for ${file.name}`);
         }
         
         // 3. Create document record
