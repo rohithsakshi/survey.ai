@@ -1,0 +1,107 @@
+.uploadWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.dropzone {
+  border: 2px dashed var(--primary);
+  border-radius: var(--radius-xl);
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.dropzone.dragging {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: var(--primary-hover);
+  transform: scale(1.02);
+}
+
+.icon {
+  color: var(--primary);
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.uploadButton {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uploadButton:hover {
+  background-color: var(--primary-hover);
+}
+
+.uploadButtonSecondary {
+  background-color: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--sidebar-border);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uploadButtonSecondary:hover {
+  background-color: var(--background);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.infoBox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.infoIcon {
+  flex-shrink: 0;
+}

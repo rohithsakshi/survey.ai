@@ -1,0 +1,164 @@
+.tableContainer {
+  background-color: var(--background);
+  color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.tableHeader {
+  padding: 0 0 16px 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  width: 300px;
+  transition: border-color 0.2s;
+}
+
+.searchBox:focus-within {
+  border-color: var(--text-muted);
+}
+
+.searchIcon {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--foreground);
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.searchInput::placeholder {
+  color: var(--text-subtle);
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 16px 24px;
+  border-bottom: 1px solid #1a1a1a;
+  vertical-align: top;
+}
+
+.table th {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.sortableHeader {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortableHeader:hover {
+  color: #cccccc;
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sortIcon {
+  color: var(--text-muted);
+}
+
+.tableRow {
+  transition: background-color 0.2s;
+  cursor: default;
+}
+
+.tableRow:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.table td {
+  color: #e4e4e7; /* slight off-white for data to contrast with bright white header */
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.pdfName {
+  color: #ffffff;
+  font-weight: 400;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted);
+}
+
+.openButton {
+  color: #a1a1aa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.openButton:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 16px 0;
+  gap: 16px;
+}
+
+.pageButton {
+  padding: 8px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageButton:not(:disabled):hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.pageInfo {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
