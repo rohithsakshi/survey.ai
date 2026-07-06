@@ -5,8 +5,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY environment variable is missing.');
+    console.log('[GEMINI OCR BACKEND] Route hit. Checking environment...');
+    const hasKey = !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 0;
+    console.log(`[GEMINI OCR BACKEND] GEMINI_API_KEY is defined and non-empty: ${hasKey}`);
+
+    if (!hasKey) {
+      throw new Error('GEMINI_API_KEY environment variable is missing or empty.');
     }
 
     const { imageBase64 } = await req.json();
@@ -38,10 +42,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ text });
   } catch (error) {
     const err = error as Error;
-    console.error('Gemini OCR Error:', err);
+    console.error('[GEMINI OCR BACKEND ERROR]:', err);
+    console.error('[GEMINI OCR BACKEND STACK]:', err.stack);
     return NextResponse.json({ 
       error: 'Failed to run OCR on Vercel Server', 
-      details: err.message 
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     }, { status: 500 });
   }
 }

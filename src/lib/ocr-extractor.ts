@@ -44,20 +44,46 @@ export async function performOcrOnPdf(
       onLog(`Converting canvas to PNG...`);
       const dataUrl = canvas.toDataURL('image/png');
       
-      onLog('Sending image to Gemini Vision API...');
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: dataUrl })
-      });
+      let response;
+      try {
+        onLog('Sending image to Gemini Vision API...');
+        response = await fetch('/api/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: dataUrl })
+        });
+      } catch (err) {
+        const fetchErr = err as Error;
+        onLog(`Fetch Network Error: ${fetchErr.message}`);
+        console.error('OCR Fetch Error:', fetchErr);
+        throw new Error(`Network error calling /api/ocr: ${fetchErr.message}`);
+      }
       
       if (!response.ok) {
-        const errData = await response.json();
-        onLog(`API Error: ${errData.details || errData.error}`);
+        let errData;
+        const textResponse = await response.text();
+        try {
+          errData = JSON.parse(textResponse);
+        } catch (err) {
+          const e = err as Error;
+          onLog(`API Error (Status ${response.status}): Non-JSON response received.`);
+          console.error(`API Error Body:`, textResponse);
+          throw new Error(`API Error ${response.status}: ${textResponse.substring(0, 100)}...`);
+        }
+        
+        onLog(`API Error ${response.status}: ${errData.details || errData.error}`);
         throw new Error(errData.details || errData.error || 'Gemini OCR failed');
       }
       
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        const e = err as Error;
+        onLog(`JSON Parse Error on successful response: ${e.message}`);
+        throw new Error(`Failed to parse Gemini response: ${e.message}`);
+      }
+      
       onLog(`OCR executed successfully via Gemini for page ${i}`);
       fullText += data.text + '\n';
     }
@@ -65,7 +91,8 @@ export async function performOcrOnPdf(
     return { text: fullText, pages: maxPages };
   } catch (error) {
     const err = error as Error;
-    console.error('OCR Error:', err);
+    console.error('OCR Error Detailed:', err);
+    onLog(`CRITICAL ERROR: ${err.message}`);
     return { text: '', pages: 0, error: err.message };
   }
 }
