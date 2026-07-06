@@ -6,6 +6,8 @@ import FileUpload from '@/components/upload/FileUpload';
 import AISummary from '@/components/summary/AISummary';
 import DataTable from '@/components/table/DataTable';
 import { DocumentData } from '@/lib/types';
+import { extractTextFromPdf } from '@/lib/pdf-extractor';
+import { db } from '@/lib/db';
 
 export default function Home() {
   const [stats, setStats] = useState({
@@ -35,10 +37,75 @@ export default function Home() {
     }
   ]);
 
-  const handleFilesSelected = (files: File[]) => {
-    // Placeholder for actual worker processing
-    console.log("Selected files: ", files);
+  const handleFilesSelected = async (files: File[]) => {
     setStats(prev => ({ ...prev, totalPdfs: prev.totalPdfs + files.length }));
+    
+    // Process each file
+    for (const file of files) {
+      try {
+        // 1. Extract text using PDF.js
+        const text = await extractTextFromPdf(file);
+        
+        let surveyNumbers: string[] = [];
+        let village = '';
+        let taluk = '';
+        let district = '';
+        
+        if (text.trim().length > 0) {
+           // 2. Send to Gemini for intelligence extraction
+           const response = await fetch('/api/extract', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ text, filename: file.name })
+           });
+           
+           if (response.ok) {
+             const data = await response.json();
+             surveyNumbers = data.surveyNumbers || [];
+             village = data.village || '';
+             taluk = data.taluk || '';
+             district = data.district || '';
+           }
+        }
+        
+        // 3. Create document record
+        const newDoc: DocumentData = {
+          id: Math.random().toString(36).substring(7), // Simple ID for now
+          pdfName: file.name,
+          surveyNumbers,
+          village,
+          taluk,
+          district
+        };
+        
+        // 4. Update UI table
+        setDocuments(prev => [newDoc, ...prev]);
+        
+        // 5. Update UI stats
+        setStats(prev => ({
+          ...prev,
+          surveyNumbersFound: prev.surveyNumbersFound + surveyNumbers.length,
+          villagesFound: prev.villagesFound + (village ? 1 : 0),
+          scannedPages: prev.scannedPages + 1 // Assuming at least 1 for now
+        }));
+        
+        // 6. Save to Dexie IndexedDB
+        await db.documents.add({
+          fileName: file.name,
+          fileHash: newDoc.id, // Mock hash
+          fileSize: file.size,
+          uploadDate: Date.now(),
+          status: 'completed',
+          surveyNumbers,
+          village,
+          taluk,
+          district
+        });
+        
+      } catch (error) {
+        console.error('Failed to process file:', file.name, error);
+      }
+    }
   };
 
   const handleRowClick = (row: DocumentData) => {
