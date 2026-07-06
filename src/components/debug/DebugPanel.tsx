@@ -77,7 +77,17 @@ export default function DebugPanel({ telemetryData }: DebugPanelProps) {
                             <div><strong>Method:</strong> {t.textExtractionMethod}</div>
                             <div><strong>Viewer Ready:</strong> {t.viewerReady ? 'YES' : 'NO'}</div>
                           </div>
-                          
+                          {t.ocrLogs && t.ocrLogs.length > 0 && (
+                            <div className={styles.terminalContainer} style={{ marginBottom: '16px' }}>
+                              <div className={styles.terminalHeader}>
+                                <Terminal size={14} /> <span>OCR Diagnostics Log</span>
+                              </div>
+                              <pre className={styles.terminalBody}>
+                                {t.ocrLogs.join('\n')}
+                              </pre>
+                            </div>
+                          )}
+
                           <div className={styles.terminalContainer}>
                             <div className={styles.terminalHeader}>
                               <Terminal size={14} /> <span>Raw Gemini Response</span>

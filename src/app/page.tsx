@@ -87,6 +87,7 @@ export default function Home() {
           textExtractionMethod: 'None',
           ocrExecuted: false,
           ocrTextLength: 0,
+          ocrLogs: [],
           geminiCalled: false,
           geminiRawResponse: '',
           extractionSuccess: false,
@@ -149,12 +150,18 @@ export default function Home() {
             updateDoc(id, { status: 'Running OCR...', telemetry });
             telemetry.ocrExecuted = true;
             telemetry.textExtractionMethod = 'OCR';
-            const ocrResult = await performOcrOnPdf(file);
+            const ocrResult = await performOcrOnPdf(file, (msg) => {
+              console.log('[OCR LOG]', msg);
+              telemetry.ocrLogs.push(msg);
+              // Force re-render to update logs in real-time
+              updateDoc(id, { telemetry: { ...telemetry } });
+            });
             text = ocrResult.text;
             telemetry.ocrTextLength = text.length;
             
             if (ocrResult.error) {
               console.error('OCR Error:', ocrResult.error);
+              telemetry.ocrLogs.push(`ERROR: ${ocrResult.error}`);
               updateDoc(id, { status: 'OCR Failed', telemetry, errorMessage: ocrResult.error });
               return; // Stop processing
             }

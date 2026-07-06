@@ -22,6 +22,7 @@ export interface DebugTelemetry {
   textExtractionMethod: 'PDF.js' | 'Fallback Parser' | 'OCR' | 'None';
   ocrExecuted: boolean;
   ocrTextLength: number;
+  ocrLogs: string[];
   geminiCalled: boolean;
   geminiRawResponse: string;
   extractionSuccess: boolean;

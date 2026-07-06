@@ -1,7 +1,12 @@
+import { createWorker } from 'tesseract.js';
 
-
-export async function performOcrOnPdf(file: File): Promise<{ text: string; pages: number; error?: string }> {
+export async function performOcrOnPdf(
+  file: File, 
+  onLog: (msg: string) => void
+): Promise<{ text: string; pages: number; error?: string }> {
   try {
+    onLog('Starting OCR process for ' + file.name);
+    
     const pdfjs = await import('pdfjs-dist');
     pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
@@ -10,16 +15,13 @@ export async function performOcrOnPdf(file: File): Promise<{ text: string; pages
     const pdf = await loadingTask.promise;
     
     let fullText = '';
-    
-    // Process up to first 3 pages to save time/memory in browser
     const maxPages = Math.min(pdf.numPages, 3);
     
     for (let i = 1; i <= maxPages; i++) {
+      onLog(`Processing page ${i} for OCR...`);
       const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
       
-      const viewport = page.getViewport({ scale: 1.5 }); // Scale for better OCR
-      
-      // Create a canvas to render the PDF page
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       if (!context) continue;
@@ -27,7 +29,6 @@ export async function performOcrOnPdf(file: File): Promise<{ text: string; pages
       canvas.height = viewport.height;
       canvas.width = viewport.width;
       
-      // Fix: fill canvas with white so Tesseract/Gemini can read it properly
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, canvas.width, canvas.height);
       
@@ -37,25 +38,38 @@ export async function performOcrOnPdf(file: File): Promise<{ text: string; pages
         viewport: viewport
       };
       
+      onLog(`Rendering PDF page ${i} to canvas...`);
       await page.render(renderContext).promise;
       
-      // Convert canvas to image data URL
+      onLog(`Converting canvas to PNG...`);
       const dataUrl = canvas.toDataURL('image/png');
       
-      // Call our Gemini Vision OCR route
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: dataUrl })
-      });
-      
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Gemini OCR failed');
+      onLog('Creating Tesseract worker...');
+      let worker;
+      try {
+        worker = await createWorker('eng', 1, {
+          logger: m => console.log('Tesseract:', m),
+        });
+        onLog('Worker created and Language loaded');
+      } catch (error) {
+        const err = error as Error;
+        onLog('Worker failed to load: ' + err.message);
+        throw new Error('Worker failed to load: ' + err.message);
       }
       
-      const data = await response.json();
-      fullText += data.text + '\n';
+      onLog('OCR ready. Executing Tesseract...');
+      try {
+        const { data: { text } } = await worker.recognize(dataUrl);
+        onLog(`OCR executed successfully for page ${i}`);
+        fullText += text + '\n';
+      } catch (error) {
+        const err = error as Error;
+        onLog('Tesseract exception during recognition: ' + err.message);
+        throw new Error('Tesseract exception: ' + err.message);
+      } finally {
+        await worker.terminate();
+        onLog('Worker terminated.');
+      }
     }
     
     return { text: fullText, pages: maxPages };
